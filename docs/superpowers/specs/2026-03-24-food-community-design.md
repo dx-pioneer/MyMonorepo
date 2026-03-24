@@ -265,6 +265,7 @@ model Tag {
 // 同时使用部分索引替代 @@unique 以正确处理 NULL：
 // CREATE UNIQUE INDEX "tagoncontent_tag_recipe" ON "TagsOnContent"("tagId", "recipeId") WHERE "recipeId" IS NOT NULL;
 // CREATE UNIQUE INDEX "tagoncontent_tag_post" ON "TagsOnContent"("tagId", "postId") WHERE "postId" IS NOT NULL;
+// CREATE INDEX "tagscontent_tag_idx" ON "TagsOnContent"("tagId");
 // Service 层也需强制校验二选一规则
 model TagsOnContent {
   id       String  @id @default(cuid())
@@ -317,9 +318,12 @@ model Like {
   recipe    Recipe? @relation(fields: [recipeId], references: [id], onDelete: Cascade)
   post      Post?   @relation(fields: [postId], references: [id], onDelete: Cascade)
 
-  // 使用部分索引替代（迁移中添加原生 SQL）
+  // 迁移中添加原生 SQL 索引：
   // CREATE UNIQUE INDEX "like_user_recipe" ON "Like"("userId", "recipeId") WHERE "recipeId" IS NOT NULL;
   // CREATE UNIQUE INDEX "like_user_post" ON "Like"("userId", "postId") WHERE "postId" IS NOT NULL;
+  // CREATE INDEX "like_user_idx" ON "Like"("userId");
+  // CREATE INDEX "like_recipe_idx" ON "Like"("recipeId") WHERE "recipeId" IS NOT NULL;
+  // CREATE INDEX "like_post_idx" ON "Like"("postId") WHERE "postId" IS NOT NULL;
 }
 
 model Favorite {
@@ -333,9 +337,12 @@ model Favorite {
   recipe    Recipe? @relation(fields: [recipeId], references: [id], onDelete: Cascade)
   post      Post?   @relation(fields: [postId], references: [id], onDelete: Cascade)
 
-  // 使用部分索引替代（迁移中添加原生 SQL）
+  // 迁移中添加原生 SQL 索引：
   // CREATE UNIQUE INDEX "fav_user_recipe" ON "Favorite"("userId", "recipeId") WHERE "recipeId" IS NOT NULL;
   // CREATE UNIQUE INDEX "fav_user_post" ON "Favorite"("userId", "postId") WHERE "postId" IS NOT NULL;
+  // CREATE INDEX "fav_user_idx" ON "Favorite"("userId");
+  // CREATE INDEX "fav_recipe_idx" ON "Favorite"("recipeId") WHERE "recipeId" IS NOT NULL;
+  // CREATE INDEX "fav_post_idx" ON "Favorite"("postId") WHERE "postId" IS NOT NULL;
 }
 
 // ============ 私信 ============
@@ -352,6 +359,7 @@ model Message {
   receiver   User @relation("receiver", fields: [receiverId], references: [id])
 
   @@index([senderId, receiverId])
+  @@index([receiverId, senderId])
 }
 
 // ============ 通知 ============
