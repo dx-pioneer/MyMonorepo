@@ -1,0 +1,327 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ 用户体系 ============
+
+model User {
+  id            String     @id @default(cuid())
+  phone         String?    @unique
+  email         String?    @unique
+  passwordHash  String
+  nickname      String
+  avatar        String?
+  bio           String?
+  role          UserRole   @default(USER)
+  status        UserStatus @default(ACTIVE)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  recipes          Recipe[]
+  posts            Post[]
+  comments         Comment[]
+  likes            Like[]
+  favorites        Favorite[]
+  followers        Follow[]       @relation("following")
+  following        Follow[]       @relation("follower")
+  sentMessages     Message[]      @relation("sender")
+  receivedMessages Message[]      @relation("receiver")
+  notifications    Notification[]
+  reports          Report[]
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  BANNED
+  DELETED
+}
+
+// ============ 关注关系 ============
+
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  follower  User @relation("follower", fields: [followerId], references: [id])
+  following User @relation("following", fields: [followingId], references: [id])
+
+  @@unique([followerId, followingId])
+  @@index([followingId])
+}
+
+// ============ 内容：食谱 ============
+
+model Recipe {
+  id          String        @id @default(cuid())
+  authorId    String
+  title       String
+  description String?
+  coverImage  String
+  difficulty  Difficulty    @default(MEDIUM)
+  cookTime    Int
+  servings    Int           @default(1)
+  status      ContentStatus @default(DRAFT)
+  viewCount   Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  author      User            @relation(fields: [authorId], references: [id])
+  ingredients Ingredient[]
+  steps       RecipeStep[]
+  tags        TagsOnContent[]
+  comments    Comment[]
+  likes       Like[]
+  favorites   Favorite[]
+
+  @@index([authorId])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+model Ingredient {
+  id       String @id @default(cuid())
+  recipeId String
+  name     String
+  amount   String
+  order    Int
+
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+}
+
+model RecipeStep {
+  id       String  @id @default(cuid())
+  recipeId String
+  content  String
+  image    String?
+  order    Int
+
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+}
+
+// ============ 内容：帖子 ============
+
+model Post {
+  id        String        @id @default(cuid())
+  authorId  String
+  title     String?
+  content   String
+  status    ContentStatus @default(DRAFT)
+  viewCount Int           @default(0)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  author    User            @relation(fields: [authorId], references: [id])
+  media     PostMedia[]
+  tags      TagsOnContent[]
+  comments  Comment[]
+  likes     Like[]
+  favorites Favorite[]
+
+  @@index([authorId])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+}
+
+model PostMedia {
+  id     String    @id @default(cuid())
+  postId String
+  url    String
+  type   MediaType
+  order  Int
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+enum ContentStatus {
+  DRAFT
+  PENDING_REVIEW
+  PUBLISHED
+  REJECTED
+  DELETED
+}
+
+// ============ 标签系统 ============
+
+model Tag {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  category  String?
+  hot       Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  contents TagsOnContent[]
+}
+
+model TagsOnContent {
+  id       String  @id @default(cuid())
+  tagId    String
+  recipeId String?
+  postId   String?
+
+  tag    Tag     @relation(fields: [tagId], references: [id])
+  recipe Recipe? @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  post   Post?   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([tagId])
+}
+
+// ============ 互动 ============
+
+model Comment {
+  id        String        @id @default(cuid())
+  authorId  String
+  recipeId  String?
+  postId    String?
+  parentId  String?
+  content   String
+  status    ContentStatus @default(PUBLISHED)
+  createdAt DateTime      @default(now())
+
+  author  User      @relation(fields: [authorId], references: [id])
+  recipe  Recipe?   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  post    Post?     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  parent  Comment?  @relation("replies", fields: [parentId], references: [id])
+  replies Comment[] @relation("replies")
+
+  @@index([recipeId])
+  @@index([postId])
+  @@index([parentId])
+}
+
+model Like {
+  id        String   @id @default(cuid())
+  userId    String
+  recipeId  String?
+  postId    String?
+  createdAt DateTime @default(now())
+
+  user   User    @relation(fields: [userId], references: [id])
+  recipe Recipe? @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  post   Post?   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  recipeId  String?
+  postId    String?
+  createdAt DateTime @default(now())
+
+  user   User    @relation(fields: [userId], references: [id])
+  recipe Recipe? @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  post   Post?   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ============ 私信 ============
+
+model Message {
+  id         String   @id @default(cuid())
+  senderId   String
+  receiverId String
+  content    String
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  sender   User @relation("sender", fields: [senderId], references: [id])
+  receiver User @relation("receiver", fields: [receiverId], references: [id])
+
+  @@index([senderId, receiverId])
+  @@index([receiverId, senderId])
+}
+
+// ============ 通知 ============
+
+model Notification {
+  id         String           @id @default(cuid())
+  userId     String
+  type       NotificationType
+  title      String
+  content    String?
+  sourceType String?
+  sourceId   String?
+  isRead     Boolean          @default(false)
+  createdAt  DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, isRead])
+}
+
+enum NotificationType {
+  LIKE
+  COMMENT
+  FOLLOW
+  SYSTEM
+}
+
+// ============ 举报 ============
+
+model Report {
+  id         String       @id @default(cuid())
+  reporterId String
+  targetType ReportTarget
+  targetId   String
+  reason     String
+  status     ReportStatus @default(PENDING)
+  createdAt  DateTime     @default(now())
+
+  reporter User @relation(fields: [reporterId], references: [id])
+
+  @@index([status])
+}
+
+enum ReportTarget {
+  RECIPE
+  POST
+  COMMENT
+  USER
+}
+
+enum ReportStatus {
+  PENDING
+  RESOLVED
+  DISMISSED
+}
+
+// ============ 运营 ============
+
+model Banner {
+  id        String    @id @default(cuid())
+  title     String
+  image     String
+  link      String?
+  position  String    @default("home")
+  order     Int       @default(0)
+  isActive  Boolean   @default(true)
+  startAt   DateTime?
+  endAt     DateTime?
+  createdAt DateTime  @default(now())
+}
